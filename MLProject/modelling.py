@@ -53,8 +53,8 @@ def load_data():
 
 def save_confusion_matrix(y_true, y_pred):
     cm = confusion_matrix(y_true, y_pred)
-    fig, ax = plt.subplots(figsize=(6, 5))
 
+    fig, ax = plt.subplots(figsize=(6, 5))
     display = ConfusionMatrixDisplay(
         confusion_matrix=cm,
         display_labels=["No Churn", "Churn"],
@@ -71,8 +71,6 @@ def save_confusion_matrix(y_true, y_pred):
 
 
 def main():
-    mlflow.set_experiment("Customer Churn CI Training")
-
     X_train, X_test, y_train, y_test = load_data()
 
     model = RandomForestClassifier(
@@ -84,16 +82,14 @@ def main():
         random_state=42,
     )
 
-    # Saat dijalankan lewat `mlflow run`, MLflow Project sudah membuat active run.
-    # Karena itu, script ini langsung log ke active run dan tidak memanggil start_run()
-    # agar tidak terjadi konflik run_id.
     active_run = mlflow.active_run()
     if active_run is not None:
-        print(f"Using active MLflow Project run_id: {active_run.info.run_id}")
+        print(f"Using MLflow active run: {active_run.info.run_id}")
     else:
-        print("No active MLflow run detected. Running direct logging without nested run.")
+        print("No active run object detected, logging will use MLflow Project run from environment.")
 
     model.fit(X_train, y_train)
+
     preds = model.predict(X_test)
     probas = model.predict_proba(X_test)[:, 1]
 
@@ -149,6 +145,7 @@ def main():
         sk_model=model,
         artifact_path="model",
     )
+
     mlflow.log_artifact(model_path)
     mlflow.log_artifact(report_path)
     mlflow.log_artifact(metrics_path)
