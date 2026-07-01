@@ -28,7 +28,7 @@ jobs:
           pip --version
           ls -la
           ls -la MLProject
-          find . -maxdepth 3 -type f
+          find . -maxdepth 4 -type f | sort
 
       - name: Install dependencies
         run: |
