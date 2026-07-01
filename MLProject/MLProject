@@ -1,4 +1,4 @@
-name: customer-churn-ci-training
+name: CustomerChurnMLProject
 
 conda_env: conda.yaml
 
