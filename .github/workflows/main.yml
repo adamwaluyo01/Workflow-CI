@@ -1,0 +1,57 @@
+name: Customer Churn MLflow CI
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  train-model:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Set up job
+        run: echo "Starting Customer Churn MLflow CI"
+
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.12.7
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12.7"
+
+      - name: Check Env
+        run: |
+          python --version
+          pip --version
+          ls -la
+          ls -la MLProject
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r MLProject/requirements.txt
+
+      - name: Set MLflow Tracking URI
+        run: |
+          echo "MLFLOW_TRACKING_URI=file:./mlruns" >> $GITHUB_ENV
+
+      - name: Run mlflow project
+        run: |
+          mlflow run MLProject --env-manager=local
+
+      - name: Get latest MLflow run_id
+        run: |
+          echo "MLflow run completed"
+          find mlruns -maxdepth 4 -type f | head -50
+
+      - name: Upload MLflow artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: mlflow-artifacts
+          path: mlruns
+
+      - name: Complete job
+        run: echo "Customer Churn MLflow CI completed"
