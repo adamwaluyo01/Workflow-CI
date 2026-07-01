@@ -1,4 +1,6 @@
 import json
+import os
+from contextlib import nullcontext
 from pathlib import Path
 
 import joblib
@@ -27,26 +29,56 @@ mlflow.set_experiment("Customer Churn CI Training")
 
 
 def load_data():
-    train = pd.read_csv(DATA_DIR / "train_preprocessed.csv")
-    test = pd.read_csv(DATA_DIR / "test_preprocessed.csv")
+    train_path = DATA_DIR / "train_preprocessed.csv"
+    test_path = DATA_DIR / "test_preprocessed.csv"
+
+    if not train_path.exists():
+        raise FileNotFoundError(f"Train dataset not found: {train_path}")
+
+    if not test_path.exists():
+        raise FileNotFoundError(f"Test dataset not found: {test_path}")
+
+    train = pd.read_csv(train_path)
+    test = pd.read_csv(test_path)
+
     X_train = train.drop(columns=["churn"])
     y_train = train["churn"]
     X_test = test.drop(columns=["churn"])
     y_test = test["churn"]
+
     return X_train, X_test, y_train, y_test
 
 
 def save_confusion_matrix(y_true, y_pred):
     cm = confusion_matrix(y_true, y_pred)
+
     fig, ax = plt.subplots(figsize=(6, 5))
-    display = ConfusionMatrixDisplay(confusion_matrix=cm, display_labels=["No Churn", "Churn"])
+    display = ConfusionMatrixDisplay(
+        confusion_matrix=cm,
+        display_labels=["No Churn", "Churn"],
+    )
     display.plot(ax=ax, values_format="d")
     ax.set_title("Customer Churn Confusion Matrix - CI")
+
     output_path = ARTIFACT_DIR / "ci_confusion_matrix.png"
     plt.tight_layout()
     plt.savefig(output_path, dpi=160)
     plt.close(fig)
+
     return output_path
+
+
+def get_mlflow_run_context():
+    active_run = mlflow.active_run()
+    env_run_id = os.environ.get("MLFLOW_RUN_ID")
+
+    if active_run is not None:
+        return nullcontext()
+
+    if env_run_id:
+        return mlflow.start_run(run_id=env_run_id)
+
+    return mlflow.start_run(run_name="customer_churn_ci_training")
 
 
 def main():
@@ -61,8 +93,9 @@ def main():
         random_state=42,
     )
 
-    with mlflow.start_run(run_name="customer_churn_ci_training"):
+    with get_mlflow_run_context():
         model.fit(X_train, y_train)
+
         preds = model.predict(X_test)
         probas = model.predict_proba(X_test)[:, 1]
 
@@ -80,6 +113,8 @@ def main():
             "target": "churn",
             "n_estimators": 150,
             "max_depth": 8,
+            "min_samples_split": 2,
+            "min_samples_leaf": 1,
             "class_weight": "balanced",
             "training_source": "github_actions_mlflow_project",
         }
@@ -92,16 +127,30 @@ def main():
 
         report_path = ARTIFACT_DIR / "classification_report.json"
         report_path.write_text(
-            json.dumps(classification_report(y_test, preds, output_dict=True, zero_division=0), indent=2),
+            json.dumps(
+                classification_report(
+                    y_test,
+                    preds,
+                    output_dict=True,
+                    zero_division=0,
+                ),
+                indent=2,
+            ),
             encoding="utf-8",
         )
 
         metrics_path = ARTIFACT_DIR / "ci_metrics.json"
-        metrics_path.write_text(json.dumps(metrics, indent=2), encoding="utf-8")
+        metrics_path.write_text(
+            json.dumps(metrics, indent=2),
+            encoding="utf-8",
+        )
 
         cm_path = save_confusion_matrix(y_test, preds)
 
-        mlflow.sklearn.log_model(model, artifact_path="model")
+        mlflow.sklearn.log_model(
+            sk_model=model,
+            artifact_path="model",
+        )
         mlflow.log_artifact(model_path)
         mlflow.log_artifact(report_path)
         mlflow.log_artifact(metrics_path)
