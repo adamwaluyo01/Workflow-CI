@@ -37,25 +37,22 @@ jobs:
 
       - name: Set MLflow Tracking URI
         run: |
-          echo "MLFLOW_TRACKING_URI=file:./mlruns" >> $GITHUB_ENV
+          echo "MLFLOW_TRACKING_URI=file:${{ github.workspace }}/mlruns" >> $GITHUB_ENV
 
-      - name: Run training script
+      - name: Run MLflow Project
         run: |
-          cd MLProject
-          python modelling.py
+          mlflow run MLProject --env-manager=local
 
       - name: Get latest MLflow artifacts
         run: |
           echo "MLflow run completed"
-          find . -maxdepth 5 -type f | head -100
+          find mlruns -maxdepth 5 -type f | head -100
 
       - name: Upload MLflow artifacts
         uses: actions/upload-artifact@v4
         with:
           name: mlflow-artifacts
-          path: |
-            MLProject/mlruns
-            mlruns
+          path: mlruns
 
       - name: Complete job
         run: echo "Customer Churn MLflow CI completed"
