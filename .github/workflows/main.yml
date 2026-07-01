@@ -41,7 +41,7 @@ jobs:
 
       - name: Run MLflow Project
         run: |
-          mlflow run MLProject --env-manager=local
+          mlflow run MLProject --env-manager=local --experiment-name "Customer Churn CI Training"
 
       - name: Get latest MLflow artifacts
         run: |
